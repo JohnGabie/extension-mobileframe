@@ -1,0 +1,12 @@
+{
+  "iphone-13": {
+    "label": "iPhone 13",
+    "image": "frames/iphone-13.png",
+    "imageWidth": 859,
+    "imageHeight": 1738,
+    "screen": { "x": 42, "y": 34, "width": 779, "height": 1668 },
+    "borderRadius": 88,
+    "cssWidth": 390,
+    "cssHeight": 844
+  }
+}

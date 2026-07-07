@@ -1,0 +1,32 @@
+name: Release to Chrome Web Store
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    name: Publish to Chrome Web Store
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Zip extension
+        run: |
+          zip -r bezel.zip \
+            manifest.json \
+            background.js \
+            content-script.js \
+            sidepanel/ \
+            assets/ \
+            icons/
+
+      - name: Upload to Chrome Web Store
+        uses: fregante/chrome-webstore-upload-action@v2
+        with:
+          file-name: bezel.zip
+          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
+          client-id: ${{ secrets.GOOGLE_CLIENT_ID }}
+          client-secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          publish: true

@@ -1,0 +1,485 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #111113;
+  --surface: #1C1C1F;
+  --border: #2C2C2F;
+  --text: #E5E5EA;
+  --text-muted: #8E8E93;
+  --accent: #5E5CE6;
+  --toolbar-h: 45px;
+  --stage-pad: 12px;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+}
+
+/* ── Toolbar ── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* ── Settings button (replaces device select in toolbar) ── */
+.settings-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+  text-align: left;
+  transition: background 0.15s;
+}
+.settings-btn:hover  { background: rgba(255,255,255,0.06); }
+.settings-btn.active { background: rgba(255,255,255,0.1);  }
+
+/* ── Settings panel (fixed overlay below toolbar) ── */
+.settings-panel {
+  position: fixed;
+  top: var(--toolbar-h);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 14px;
+  /* collapsed */
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.25s ease;
+  pointer-events: none;
+}
+.settings-panel.open {
+  max-height: 300px;
+  opacity: 1;
+  padding: 14px;
+  pointer-events: auto;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.settings-section-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.settings-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 12px 0;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+/* device select — now lives inside the settings panel */
+#device-select {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  appearance: auto;
+}
+#device-select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ── iOS-style toggle switch ── */
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+}
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #3A3A3C;
+  border-radius: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  transition: transform 0.2s;
+}
+.toggle input:checked + .toggle-slider            { background: #30D158; }
+.toggle input:checked + .toggle-slider::before    { transform: translateX(18px); }
+
+.status {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.status.error { color: #FF453A; }
+.status.ok    { color: #30D158; }
+
+/* ── Stage ── */
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--stage-pad);
+  height: calc(100vh - var(--toolbar-h));
+  overflow: hidden;
+}
+
+/* ── Phone frame container ── */
+.phone-frame {
+  position: relative;
+  /*
+   * Fit the phone inside the panel without distortion.
+   * width = min(full container width, the width that fills the available height).
+   * aspect-ratio then derives the height from that width — always correct ratio.
+   */
+  width: min(
+    100%,
+    calc((100vh - var(--toolbar-h) - 2 * var(--stage-pad)) * var(--phone-ratio, 0.4942))
+  );
+  aspect-ratio: var(--phone-ar, 859 / 1738);
+  filter: drop-shadow(0 12px 32px rgba(0,0,0,0.6));
+  flex-shrink: 0;
+}
+
+.frame-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  z-index: 2;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Screen cutout (positioned by JS) ── */
+.screen-cutout {
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  background: #000;
+  /* left/top/width/height/border-radius set by JS */
+  container-type: inline-size; /* enables cqi units inside */
+  --sb-h: 5.2%;
+  --bb-top-h: 0%;
+  --bb-bot-h: 0%;
+}
+
+.screen-cutout iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: none;
+  outline: none;
+  display: block;
+  transform-origin: top left;
+  /* width / height / transform set by JS — renders at device CSS resolution then scaled down */
+}
+
+/* ── iOS-style status bar overlay ── */
+.status-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  height: var(--sb-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* ~24px padding on a 390pt screen = 6.15%; leaving center empty for notch */
+  padding: 0 6.2%;
+  background: #fff;
+  color: #000;
+  /* ~15pt on 390pt screen ≈ 3.85cqi */
+  font-size: 3.85cqi;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  pointer-events: none;
+  user-select: none;
+}
+
+.sb-right {
+  display: flex;
+  align-items: center;
+  gap: 1cqi;
+}
+
+.sb-icon {
+  height: 2.8cqi;
+  width: auto;
+  display: block;
+}
+
+/* battery icon is slightly wider than signal/wifi */
+.sb-bat-svg {
+  height: 3cqi;
+}
+
+/* ── Home indicator ── */
+.home-indicator {
+  position: absolute;
+  bottom: 1%;
+  left: 50%;
+  transform: translateX(-50%);
+  /* ~134pt wide on a 390pt screen ≈ 34% of screen width */
+  width: 34%;
+  /* ~5pt tall on a 390pt screen ≈ 1.3cqi */
+  height: 1.3cqi;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 999px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* ── Blocked notice (hidden by default) ── */
+.blocked-notice {
+  display: none;
+  position: absolute;
+  inset: calc(var(--sb-h) + var(--bb-top-h)) 0 var(--bb-bot-h);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #0a0a0a;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 16px;
+}
+
+.blocked-notice.visible {
+  display: flex;
+}
+
+.blocked-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.blocked-notice p {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.blocked-notice .blocked-sub {
+  opacity: 0.6;
+  font-size: 10px;
+}
+
+.blocked-notice code {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  background: rgba(255,255,255,0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* ── Browser bars ── */
+.br-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: none; /* shown by JS */
+  align-items: center;
+  background: #F2F2F7;
+  border-color: rgba(0,0,0,0.12);
+  pointer-events: none;
+  user-select: none;
+}
+.br-bar.visible { display: flex; }
+
+.br-top {
+  top: var(--sb-h);
+  height: var(--bb-top-h);
+  border-bottom: 0.5px solid rgba(0,0,0,0.12);
+  padding: 0 3cqi;
+}
+
+.br-bottom {
+  bottom: 0;
+  height: var(--bb-bot-h);
+  border-top: 0.5px solid rgba(0,0,0,0.12);
+  justify-content: space-around;
+  padding: 0;
+}
+
+/* variant wrapper — fills bar, shown/hidden per browser */
+.br-variant {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  gap: 2cqi;
+}
+
+/* URL pill */
+.br-url-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 1cqi;
+  background: rgba(0,0,0,0.06);
+  border-radius: 999px;
+  height: 56%;
+  padding: 0 2.5cqi;
+  min-width: 0;
+}
+.br-chrome-url-field {
+  background: rgba(0,0,0,0.06);
+}
+
+.br-lock {
+  width: 2.4cqi;
+  height: auto;
+  flex-shrink: 0;
+}
+
+.br-url-text {
+  font-size: 3.3cqi;
+  color: #1C1C1E;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.br-reload-icon {
+  width: 3cqi;
+  height: auto;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* AA button (Safari top-left) */
+.br-aa-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #007AFF;
+  display: flex;
+  align-items: baseline;
+  gap: 0.1cqi;
+  font-size: 3.6cqi;
+  font-weight: 400;
+  flex-shrink: 0;
+  padding: 0;
+}
+.br-aa-small { font-size: 2.5cqi; }
+
+/* Share / action button (Safari top-right) */
+.br-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+.br-share-icon {
+  width: 4.2cqi;
+  height: auto;
+}
+
+/* Chrome ⋮ button */
+.br-dots-btn {
+  font-size: 4.5cqi;
+  color: #6D6D72;
+  line-height: 1;
+  padding: 0 0.5cqi;
+}
+
+/* Bottom nav buttons */
+.br-nav-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  height: 100%;
+  padding: 0;
+}
+.br-nav-icon {
+  width: 5.5cqi;
+  height: auto;
+  display: block;
+}
+
+/* browser select inside settings panel */
+#browser-select {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  appearance: auto;
+}
+#browser-select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

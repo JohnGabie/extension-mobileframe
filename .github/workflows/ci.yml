@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    name: Validate & lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate JSON
+        run: |
+          jq empty manifest.json
+          jq empty assets/frame-config.json
+
+      - name: Check JS syntax
+        run: |
+          node --check background.js
+          node --check content-script.js
+          node --check sidepanel/panel.js
+
+  package:
+    name: Package extension
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Zip extension
+        run: |
+          zip -r bezel.zip \
+            manifest.json \
+            background.js \
+            content-script.js \
+            sidepanel/ \
+            assets/ \
+            icons/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bezel-${{ github.sha }}
+          path: bezel.zip
+          retention-days: 30
