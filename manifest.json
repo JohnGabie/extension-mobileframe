@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Phone Frame Simulator",
+  "name": "MobileFrame Simulator",
   "version": "0.1.0",
-  "description": "Mostra a aba ativa dentro de uma moldura de celular no painel lateral.",
+  "description": "Mirror any browser tab inside a real phone frame — scroll, media and navigation stay in sync.",
   "permissions": ["sidePanel", "tabs", "scripting", "storage", "declarativeNetRequest"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js" },
@@ -16,7 +16,7 @@
   ],
   "side_panel": { "default_path": "sidepanel/panel.html" },
   "action": {
-    "default_title": "Phone Frame Simulator",
+    "default_title": "MobileFrame Simulator",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

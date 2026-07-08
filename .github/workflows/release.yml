@@ -13,7 +13,7 @@ jobs:
 
       - name: Zip extension
         run: |
-          zip -r bezel.zip \
+          zip -r mobile-frame.zip \
             manifest.json \
             background.js \
             content-script.js \
@@ -24,7 +24,7 @@ jobs:
       - name: Upload to Chrome Web Store
         uses: fregante/chrome-webstore-upload-action@v2
         with:
-          file-name: bezel.zip
+          file-name: mobile-frame.zip
           extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
           client-id: ${{ secrets.GOOGLE_CLIENT_ID }}
           client-secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
