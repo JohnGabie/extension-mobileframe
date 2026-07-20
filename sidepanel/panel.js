@@ -10,6 +10,8 @@ const blockedNotice = document.getElementById('blocked-notice');
 const deviceLabel   = document.getElementById('device-label');
 const settingsBtn   = document.getElementById('settings-btn');
 const settingsPanel = document.getElementById('settings-panel');
+const toggleAllTabs = document.getElementById('toggle-all-tabs');
+const pausedOverlay = document.getElementById('paused-overlay');
 const statusBarEl   = document.getElementById('status-bar-overlay');
 const homeIndicator = document.getElementById('home-indicator');
 
@@ -31,20 +33,62 @@ let currentDevice = 'iphone-13';
 let currentUrl = '';
 let isBlocked = false;
 let _mirrorReady = false;
-let _skipNextTabUpdate = false; // suppresses echo when mirror drives real-tab navigation
+
+// Tab-lock: in 'single' mode the mirror is locked to targetTabId and ignores every
+// other tab; 'all' mode follows whichever tab is active (legacy behavior).
+let mode = 'single';       // persisted in chrome.storage.local
+let targetTabId = null;    // the locked tab (set on boot from the active tab)
+let activeTabId = null;    // the tab currently focused in the browser
+
+// True when an incoming tab-scoped message belongs to the tab we should sync with.
+function isSyncTab(tabId) {
+  return mode === 'all' || tabId == null || tabId === targetTabId;
+}
+
+// In single mode, when the user is looking at a different tab, show a "locked to
+// another tab" overlay instead of syncing/following it.
+function updateLockState() {
+  const paused = mode === 'single' && targetTabId != null &&
+                 activeTabId != null && activeTabId !== targetTabId;
+  if (pausedOverlay) pausedOverlay.classList.toggle('visible', paused);
+}
+
+// Navigation sync is bidirectional (desktop↔mobile). Every programmatic sync of one
+// side triggers a navigation event on the other side as an echo (plus redirects and
+// multiple onUpdated events). We swallow that echo with a short time window per
+// direction instead of matching exact URLs — which broke on normalization/redirects.
+const SYNC_WINDOW = 1500;   // ms — covers redirects + multiple onUpdated events
+let suppressTabSync = 0;    // ignore tab→mirror events until this timestamp
+let suppressMirrorSync = 0; // ignore mirror→tab events until this timestamp
+
+function sameUrl(a, b) {
+  try { return new URL(a).href === new URL(b).href; }
+  catch { return a === b; }
+}
 
 // ── Load config and boot ──────────────────────────────────────────────
-fetch(BASE + 'frame-config.json')
-  .then(r => r.json())
-  .then(data => {
-    config = data;
-    applyDevice(currentDevice);
-    getActiveTabUrl();
-  });
+chrome.storage.local.get('pfs_mode', ({ pfs_mode }) => {
+  mode = pfs_mode === 'all' ? 'all' : 'single';
+  if (toggleAllTabs) toggleAllTabs.checked = (mode === 'all');
 
+  fetch(BASE + 'frame-config.json')
+    .then(r => r.json())
+    .then(data => {
+      config = data;
+      applyDevice(currentDevice);
+      getActiveTabUrl();
+    });
+});
+
+// Bind (or re-bind) the mirror to the currently active tab.
 function getActiveTabUrl() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0]?.url) navigateTo(tabs[0].url);
+    if (!tabs[0]) return;
+    targetTabId = tabs[0].id;
+    activeTabId = tabs[0].id;
+    chrome.runtime.sendMessage({ type: 'pfs_bind', tabId: targetTabId });
+    updateLockState();
+    if (tabs[0].url) navigateTo(tabs[0].url);
   });
 }
 
@@ -93,15 +137,30 @@ function applyBorderRadius() {
 // Render the iframe at the device's native CSS resolution then scale to fit the cutout.
 // This ensures sites see the correct viewport width (e.g. 390px for iPhone 13)
 // instead of the small physical pixel size of the frame in the panel.
+function resolvePct(cs, name, base) {
+  const raw = cs.getPropertyValue(name).trim(); // e.g. "5.2%" or "0%"
+  const n = parseFloat(raw) || 0;
+  return raw.endsWith('%') ? n / 100 * base : n;
+}
+
 function applyIframeScale() {
   const dev = _currentDev;
   if (!dev?.cssWidth) return;
   const cw = screenCutout.offsetWidth;
   const ch = screenCutout.offsetHeight;
   if (!cw || !ch) return;
+
+  // Inset the mirror below the status bar + address bar and above the bottom bar,
+  // so the fake iOS chrome never covers the site's own content (Safari behavior).
+  const cs = getComputedStyle(screenCutout);
+  const topInset = resolvePct(cs, '--sb-h', ch) + resolvePct(cs, '--bb-top-h', ch);
+  const botInset = resolvePct(cs, '--bb-bot-h', ch);
+  const availH = Math.max(0, ch - topInset - botInset);
+
   const scale = cw / dev.cssWidth;
+  mirror.style.top       = topInset + 'px';
   mirror.style.width     = dev.cssWidth + 'px';
-  mirror.style.height    = Math.ceil(ch / scale) + 'px';
+  mirror.style.height    = Math.ceil(availH / scale) + 'px';
   mirror.style.transform = `scale(${scale})`;
 }
 
@@ -122,12 +181,14 @@ function navigateTo(url) {
   _mirrorReady = false;
   clearBlocked();
   currentUrl = url;
+  suppressMirrorSync = Date.now() + SYNC_WINDOW; // the mirror's own load echo is ours
   mirror.src = url;
   updateBrowserUrl(url);
 }
 
 function reloadMirror() {
   if (!currentUrl) return;
+  suppressMirrorSync = Date.now() + SYNC_WINDOW; // the mirror's own load echo is ours
   mirror.src = currentUrl;
 }
 
@@ -143,14 +204,19 @@ window.addEventListener('message', (e) => {
 
   // Mirror navigated (full page reload or SPA pushState) — sync real tab
   if (e.data?.type === 'pfs_mirror_navigated') {
+    if (Date.now() < suppressMirrorSync) return; // echo of a load we triggered
     const url = e.data.url;
-    if (!url || url === currentUrl) return;
+    if (!url || sameUrl(url, currentUrl)) return;
     currentUrl = url;
     updateBrowserUrl(url);
-    _skipNextTabUpdate = true;
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) chrome.tabs.update(tabs[0].id, { url });
-    });
+    suppressTabSync = Date.now() + SYNC_WINDOW;  // swallow the echo coming back from the tab
+    if (mode === 'single') {
+      if (targetTabId != null) chrome.tabs.update(targetTabId, { url });
+    } else {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) chrome.tabs.update(tabs[0].id, { url });
+      });
+    }
   }
 });
 
@@ -208,6 +274,7 @@ document.getElementById('toggle-statusbar').addEventListener('change', (e) => {
   const show = e.target.checked;
   statusBarEl.style.display = show ? '' : 'none';
   screenCutout.style.setProperty('--sb-h', show ? '5.2%' : '0%');
+  applyIframeScale(); // inset changed — reflow the mirror
 });
 
 // Toggle: home indicator
@@ -278,6 +345,8 @@ function applyBrowserBars() {
 
   // Show/hide settings toggles section
   browserToggles.style.display = browser !== 'none' ? '' : 'none';
+
+  applyIframeScale(); // insets changed — reflow the mirror
 }
 
 browserSelect.addEventListener('change', applyBrowserBars);
@@ -286,6 +355,23 @@ toggleBrBottom.addEventListener('change', applyBrowserBars);
 
 // ── Messages from background ──────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg) => {
+  // Track the focused tab (regardless of mode) to drive the "locked elsewhere" overlay.
+  if (msg.type === 'pfs_tab_activated') {
+    activeTabId = msg.tabId;
+    updateLockState();
+  }
+
+  // The target-closed notice is not tab-scoped — handle it before the filter.
+  if (msg.type === 'pfs_target_closed') {
+    targetTabId = null;
+    updateLockState();
+    showBlocked('A aba espelhada foi fechada.');
+    return;
+  }
+
+  // In single-tab mode, ignore every event that isn't from the locked tab.
+  if (!isSyncTab(msg.tabId)) return;
+
   switch (msg.type) {
     case 'pfs_scroll':
       mirror.contentWindow?.postMessage({ type: 'pfs_scroll', y: msg.y, x: msg.x }, '*');
@@ -296,20 +382,33 @@ chrome.runtime.onMessage.addListener((msg) => {
       break;
 
     case 'pfs_tab_navigated':
-      // If this is the echo of our own mirror-driven navigation, ignore it
-      if (_skipNextTabUpdate && msg.url === currentUrl) {
-        _skipNextTabUpdate = false;
-      } else {
-        navigateTo(msg.url);
-      }
+      if (Date.now() < suppressTabSync) break; // echo of our own mirror-driven navigation
+      navigateTo(msg.url);
       break;
 
     case 'pfs_tab_loading':
-      if (!_skipNextTabUpdate) reloadMirror();
+      if (Date.now() < suppressTabSync) break; // echo of our own mirror-driven navigation
+      reloadMirror();
       break;
 
     case 'pfs_tab_activated':
+      // isSyncTab already filtered out non-target tabs in single mode; returning to
+      // the locked tab shouldn't force a reload if it still shows the same URL.
+      if (mode === 'single' && sameUrl(msg.url, currentUrl)) break;
       navigateTo(msg.url);
       break;
   }
 });
+
+// ── Tab mode toggle ("Funcionar em todas as abas") ────────────────────
+if (toggleAllTabs) {
+  toggleAllTabs.addEventListener('change', (e) => {
+    mode = e.target.checked ? 'all' : 'single';
+    chrome.storage.local.set({ pfs_mode: mode });
+    // Tell the background to reconfigure panel visibility (contextual vs global).
+    chrome.runtime.sendMessage({ type: 'pfs_set_mode', mode, tabId: targetTabId });
+    // Re-bind to the current tab: 'all' resumes following it, 'single' locks onto it.
+    clearBlocked();
+    getActiveTabUrl();
+  });
+}

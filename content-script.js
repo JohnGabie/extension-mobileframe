@@ -37,6 +37,18 @@ if (!isMainFrame && !isMirror) {
   document.querySelectorAll('video, audio').forEach(attachMedia);
 
 } else if (isMirror) {
+  // Neutralize JS frame-busting by redefining top/parent/frameElement in the page's own JS world.
+  // Must run before page scripts (document_start) so the checks see the overridden values.
+  const bust = document.createElement('script');
+  bust.textContent = `(function(){try{
+    var w=window;
+    Object.defineProperty(w,'top',         {get:function(){return w;},configurable:true});
+    Object.defineProperty(w,'parent',      {get:function(){return w;},configurable:true});
+    Object.defineProperty(w,'frameElement',{get:function(){return null;},configurable:true});
+  }catch(e){}})();`;
+  document.documentElement.appendChild(bust);
+  bust.remove();
+
   // Hide scrollbars
   const s = document.createElement('style');
   s.textContent = '::-webkit-scrollbar{display:none!important}html,body{scrollbar-width:none!important;overflow:-moz-scrollbars-none!important}';

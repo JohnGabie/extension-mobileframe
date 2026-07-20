@@ -33,6 +33,19 @@
     <div class="settings-separator"></div>
 
     <div class="settings-group">
+      <p class="settings-section-title">Abas</p>
+      <div class="settings-row">
+        <span>Funcionar em todas as abas</span>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-all-tabs">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="settings-separator"></div>
+
+    <div class="settings-group">
       <p class="settings-section-title">Interface</p>
       <div class="settings-row">
         <span>Barra de status</span>
@@ -155,6 +168,13 @@
           <div class="blocked-icon">🚫</div>
           <p>Este site não pode ser exibido aqui.</p>
           <p class="blocked-sub">Conexão recusada, <code>X-Frame-Options</code> ou CSP <code>frame-ancestors</code>.</p>
+        </div>
+
+        <!-- Locked-to-another-tab overlay -->
+        <div class="paused-overlay" id="paused-overlay">
+          <div class="blocked-icon">🔒</div>
+          <p>Espelho travado em outra aba.</p>
+          <p class="blocked-sub">Volte para a aba original para sincronizar, ou ative <strong>Funcionar em todas as abas</strong>.</p>
         </div>
 
         <!-- Browser navigation bar (bottom) -->

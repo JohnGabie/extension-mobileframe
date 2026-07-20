@@ -12,7 +12,11 @@ Documentos de referência (ler antes de planejar mudanças grandes):
 - `03-ROADMAP.md` — ordem das fases de implementação.
 
 ## Regra mais importante do projeto
-Nem todo site pode ser embutido em iframe (bloqueio `X-Frame-Options` / CSP `frame-ancestors`). **Isso não é um bug para "resolver"** — é uma limitação do navegador. Quando o iframe falhar ao carregar, a solução correta é mostrar um aviso amigável no painel, nunca tentar "burlar" o bloqueio (proxy, remoção de headers, etc. estão fora de escopo e não devem ser implementados).
+Como ferramenta de dev, a extensão **tenta ativamente embutir qualquer site** no espelho, contornando os bloqueios de iframe (`X-Frame-Options` / CSP `frame-ancestors`). Isso é feito de forma **intencional e restrita ao iframe do espelho**:
+- `background.js` usa `declarativeNetRequest` para remover os headers `X-Frame-Options` e `Content-Security-Policy` **apenas** em `resourceTypes: ['sub_frame']` — a navegação normal do usuário na aba real não é afetada.
+- `content-script.js` (contexto `isMirror`) neutraliza frame-busting via JS, redefinindo `window.top` / `window.parent` / `frameElement`.
+
+Quando, mesmo assim, o embed falhar (ex.: conexão recusada, redirect que quebra), a solução correta é mostrar o **aviso amigável** no painel — não insistir com hacks adicionais (proxy externo, reescrita de HTML, etc. continuam fora de escopo).
 
 ## Stack e convenções
 - **Vanilla JS + HTML/CSS puro.** Sem framework, sem build step (webpack/vite/etc). Se em algum momento parecer necessário adicionar um bundler, perguntar antes — não é a decisão default deste projeto.
@@ -43,7 +47,7 @@ Nem todo site pode ser embutido em iframe (bloqueio `X-Frame-Options` / CSP `fra
 ## O que NÃO fazer
 - Não adicionar Chrome Web Store / publicação — fora de escopo por enquanto (ver PRD).
 - Não implementar captura por screenshot (`chrome.tabs.captureVisibleTab`) a menos que explicitamente pedido — é a Fase 6/v2, não o MVP.
-- Não tentar contornar bloqueios de iframe de sites (ver "Regra mais importante" acima).
+- O contorno de bloqueios de iframe é feito **só** pela remoção de headers em `sub_frame` + frame-busting via JS (ver "Regra mais importante" acima). Não adicionar outros métodos (proxy externo, reescrita de HTML no servidor, etc.) — esses continuam fora de escopo.
 - Não introduzir framework de UI (React/Vue) nem bundler sem confirmação explícita.
 - **Nunca criar molduras de dispositivo em SVG/CSS/canvas.** Toda moldura de aparelho deve ser uma foto PNG real do device. Para adicionar novo modelo: pedir foto ao usuário → rodar o script de flood fill para medir a área transparente → preencher `frame-config.json`. Zero design em código.
 

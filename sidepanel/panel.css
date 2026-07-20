@@ -228,6 +228,7 @@ html, body {
   outline: none;
   display: block;
   transform-origin: top left;
+  z-index: 1;
   /* width / height / transform set by JS — renders at device CSS resolution then scaled down */
 }
 
@@ -237,7 +238,7 @@ html, body {
   top: 0;
   left: 0;
   right: 0;
-  z-index: 3;
+  z-index: 999;
   height: var(--sb-h);
   display: flex;
   align-items: center;
@@ -305,6 +306,37 @@ html, body {
 
 .blocked-notice.visible {
   display: flex;
+}
+
+/* ── Locked-to-another-tab overlay ── */
+.paused-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 1000; /* above status bar / browser bars */
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(10, 10, 10, 0.86);
+  color: var(--text-muted);
+  text-align: center;
+  padding: 16px;
+}
+.paused-overlay.visible {
+  display: flex;
+}
+.paused-overlay p {
+  font-size: 11px;
+  line-height: 1.4;
+}
+.paused-overlay .blocked-sub {
+  opacity: 0.7;
+  font-size: 10px;
+}
+.paused-overlay strong {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .blocked-icon {
