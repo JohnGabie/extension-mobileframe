@@ -10,6 +10,9 @@
 
 Then follow [Installation](#installation) to load it in Chrome (Developer mode → Load unpacked). No Chrome Web Store account needed.
 
+> **Browser support:** Chrome and other Chromium browsers (Edge, Brave, Opera) only.
+> **Firefox is not supported** — it lacks the `chrome.sidePanel` API this extension is built on.
+
 MobileFrame Simulator opens a **side panel** showing your current tab inside a photographic phone frame (currently iPhone 13). As you scroll, navigate or reload the real tab, the mirror follows — and vice versa. It's a lightweight way for front-end developers to see a site "on a real phone" without leaving the browser.
 
 ## Screenshot
