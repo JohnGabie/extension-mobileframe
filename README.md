@@ -4,6 +4,11 @@
 
 [![CI](https://github.com/JohnGabie/extension-mobileframe/actions/workflows/ci.yml/badge.svg)](https://github.com/JohnGabie/extension-mobileframe/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Download](https://img.shields.io/badge/⬇%20Download-latest%20release-2ea44f)](https://github.com/JohnGabie/extension-mobileframe/releases/latest/download/mobileframe-simulator.zip)
+
+### ⬇️ [Download the latest version](https://github.com/JohnGabie/extension-mobileframe/releases/latest/download/mobileframe-simulator.zip)
+
+Then follow [Installation](#installation) to load it in Chrome (Developer mode → Load unpacked). No Chrome Web Store account needed.
 
 MobileFrame Simulator opens a **side panel** showing your current tab inside a photographic phone frame (currently iPhone 13). As you scroll, navigate or reload the real tab, the mirror follows — and vice versa. It's a lightweight way for front-end developers to see a site "on a real phone" without leaving the browser.
 
@@ -46,8 +51,7 @@ This extension is not on the Chrome Web Store, so it is installed **unpacked**
 
 ### For testers (no Git needed)
 
-1. **Download the ZIP:** [github.com/JohnGabie/extension-mobileframe → Download ZIP](https://github.com/JohnGabie/extension-mobileframe/archive/refs/heads/master.zip)
-   (or use the green **Code ▾ → Download ZIP** button on the [repo page](https://github.com/JohnGabie/extension-mobileframe)).
+1. **[⬇️ Download `mobileframe-simulator.zip`](https://github.com/JohnGabie/extension-mobileframe/releases/latest/download/mobileframe-simulator.zip)** (latest release).
 2. **Unzip** it somewhere you'll keep it (deleting the folder removes the extension).
 3. Open **`chrome://extensions`** in Chrome.
 4. Turn on **Developer mode** (top-right toggle).
