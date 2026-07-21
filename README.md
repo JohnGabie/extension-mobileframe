@@ -41,13 +41,30 @@ This is scoped, deliberate and documented — see [SECURITY.md](SECURITY.md) and
 
 ## Installation
 
-This extension is not on the Chrome Web Store. Load it unpacked:
+This extension is not on the Chrome Web Store, so it is installed **unpacked**
+(Developer mode). That is normal and expected for a tool distributed via GitHub.
 
-1. Clone this repository.
-2. Open `chrome://extensions`.
-3. Enable **Developer mode** (top-right).
-4. Click **Load unpacked** and select the project folder.
-5. Pin the extension and click its icon on any tab to open the mirror.
+### For testers (no Git needed)
+
+1. **Download the ZIP:** [github.com/JohnGabie/extension-mobileframe → Download ZIP](https://github.com/JohnGabie/extension-mobileframe/archive/refs/heads/master.zip)
+   (or use the green **Code ▾ → Download ZIP** button on the [repo page](https://github.com/JohnGabie/extension-mobileframe)).
+2. **Unzip** it somewhere you'll keep it (deleting the folder removes the extension).
+3. Open **`chrome://extensions`** in Chrome.
+4. Turn on **Developer mode** (top-right toggle).
+5. Click **Load unpacked** and select the unzipped folder (the one containing
+   `manifest.json`).
+6. Pin the extension and click its icon on any tab to open the mirror.
+
+> To update later, download the ZIP again and repeat, or click **Reload** on the
+> extension card in `chrome://extensions`.
+
+### From source (developers)
+
+```bash
+git clone https://github.com/JohnGabie/extension-mobileframe.git
+```
+
+Then follow steps 3–6 above, selecting the cloned folder.
 
 ## Usage
 
