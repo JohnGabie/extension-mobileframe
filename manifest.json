@@ -3,7 +3,7 @@
   "name": "MobileFrame Simulator",
   "version": "0.1.0",
   "description": "Mirror any browser tab inside a real phone frame — scroll, media and navigation stay in sync.",
-  "permissions": ["sidePanel", "tabs", "scripting", "storage", "declarativeNetRequest"],
+  "permissions": ["sidePanel", "tabs", "storage", "declarativeNetRequest"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js" },
   "content_scripts": [

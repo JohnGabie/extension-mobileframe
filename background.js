@@ -1,69 +1,91 @@
 const PANEL_PATH = 'sidepanel/panel.html';
 
-// ── Panel scope ───────────────────────────────────────────────────────
-// 'single' (default): a *contextual* side panel — it exists only on the tab where
-//   the user opened it and is completely hidden on every other tab (as if never
-//   opened there). Implemented with per-tab sidePanel.setOptions + sidePanel.open.
-// 'all': a global side panel available on every tab (legacy "follow active tab").
-async function getMode() {
-  const { pfs_mode } = await chrome.storage.local.get('pfs_mode');
-  return pfs_mode === 'all' ? 'all' : 'single';
+// The side panel is a normal global panel opened by Chrome on the toolbar click
+// (openPanelOnActionClick). This is the only gesture-safe way to open it reliably —
+// calling sidePanel.open() ourselves after any await loses the user gesture and fails.
+// "Locking" the mirror to a single tab is done entirely in the panel: it binds to the
+// tab it opened on, ignores messages from other tabs, and shows a "locked to another
+// tab" overlay when you switch away. See sidepanel/panel.js.
+async function enablePanelEverywhere() {
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+  // Clear any stale per-tab enabled:false overrides left by older builds, so the
+  // panel is openable on every tab.
+  try {
+    await chrome.sidePanel.setOptions({ path: PANEL_PATH, enabled: true }); // global default
+    const tabs = await chrome.tabs.query({});
+    for (const t of tabs) {
+      if (t.id == null) continue;
+      try { await chrome.sidePanel.setOptions({ tabId: t.id, path: PANEL_PATH, enabled: true }); } catch (_) {}
+    }
+  } catch (_) {}
 }
 
-// Configure panel visibility for the given mode. In single mode the panel is enabled
-// only on `focusTabId` (and the global default is off, so new tabs stay hidden).
-// Setting options for non-active tabs does not recreate the open panel, so there is
-// no flicker when this runs.
-async function applyMode(mode, focusTabId) {
-  // Global default: shown everywhere in 'all', hidden everywhere in 'single'.
-  try { await chrome.sidePanel.setOptions({ path: PANEL_PATH, enabled: mode === 'all' }); } catch (_) {}
+chrome.runtime.onInstalled.addListener(enablePanelEverywhere);
+chrome.runtime.onStartup.addListener(enablePanelEverywhere);
 
-  const tabs = await chrome.tabs.query({});
-  for (const t of tabs) {
-    if (t.id == null) continue;
-    const on = mode === 'all' || t.id === focusTabId;
-    try { await chrome.sidePanel.setOptions({ tabId: t.id, path: PANEL_PATH, enabled: on }); } catch (_) {}
+// ── Force-embed header rules ──────────────────────────────────────────
+// To embed sites that set X-Frame-Options / CSP frame-ancestors, we strip those
+// response headers — but ONLY for sub_frame requests (the mirror iframe; top-level
+// navigation is never touched) and ONLY while the panel is open AND the user's
+// "force embed" preference is on. Scoping to the panel's lifetime keeps normal
+// browsing unaffected whenever the tool isn't actively in use.
+const HEADER_RULE_ID = 1;
+let openPanels = 0;
+
+async function isForceEmbedEnabled() {
+  const { pfs_force_embed } = await chrome.storage.local.get('pfs_force_embed');
+  return pfs_force_embed !== false; // default ON
+}
+
+async function enableHeaderRules() {
+  try {
+    await chrome.declarativeNetRequest.updateSessionRules({
+      removeRuleIds: [HEADER_RULE_ID],
+      addRules: [{
+        id: HEADER_RULE_ID,
+        priority: 1,
+        action: {
+          type: 'modifyHeaders',
+          responseHeaders: [
+            { header: 'X-Frame-Options', operation: 'remove' },
+            { header: 'Content-Security-Policy', operation: 'remove' },
+          ]
+        },
+        condition: { resourceTypes: ['sub_frame'] }
+      }]
+    });
+  } catch (_) {}
+}
+
+async function disableHeaderRules() {
+  try {
+    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [HEADER_RULE_ID] });
+  } catch (_) {}
+}
+
+// Enable the rules iff a panel is open and the preference is on; otherwise remove them.
+async function refreshHeaderRules() {
+  if (openPanels > 0 && await isForceEmbedEnabled()) {
+    await enableHeaderRules();
+  } else {
+    await disableHeaderRules();
   }
 }
 
-chrome.runtime.onInstalled.addListener(async () => {
-  // We open the panel ourselves per tab, so don't let the action toggle a global one.
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
-  await applyMode(await getMode(), null); // no target yet → single: hidden everywhere
-});
+// Start clean: session rules survive SW restarts, so drop any stale rule on wake.
+// Open panels re-enable via their port connection below.
+disableHeaderRules();
 
-chrome.runtime.onStartup.addListener(async () => {
-  await applyMode(await getMode(), null);
-});
-
-// Clicking the toolbar icon opens the panel bound to that specific tab.
-chrome.action.onClicked.addListener(async (tab) => {
-  if (tab.id == null) return;
-  const mode = await getMode();
-  await applyMode(mode, tab.id);
-  if (mode === 'single') await chrome.storage.session.set({ pfs_target: tab.id });
-  try { await chrome.sidePanel.open({ tabId: tab.id }); } catch (_) {}
-});
-
-// Remove iframe-blocking headers for sub_frame requests only.
-// Main tab headers are untouched — only affects our mirror iframe.
-// Session rules are re-added every time the service worker starts.
-chrome.declarativeNetRequest.updateSessionRules({
-  removeRuleIds: [1],
-  addRules: [{
-    id: 1,
-    priority: 1,
-    action: {
-      type: 'modifyHeaders',
-      responseHeaders: [
-        { header: 'X-Frame-Options', operation: 'remove' },
-        { header: 'Content-Security-Policy', operation: 'remove' },
-      ]
-    },
-    condition: {
-      resourceTypes: ['sub_frame']
-    }
-  }]
+// The panel holds a long-lived port while open, so we can scope the header rules
+// to exactly the time the mirror is on screen.
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'pfs_panel') return;
+  openPanels++;
+  refreshHeaderRules();
+  port.onDisconnect.addListener(() => {
+    openPanels = Math.max(0, openPanels - 1);
+    refreshHeaderRules();
+  });
 });
 
 async function getTarget() {
@@ -77,12 +99,9 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
   if (!sender.tab) {
     if (msg.type === 'pfs_bind') {
       chrome.storage.session.set({ pfs_target: msg.tabId });
-    } else if (msg.type === 'pfs_set_mode') {
-      chrome.storage.local.set({ pfs_mode: msg.mode });
-      applyMode(msg.mode, msg.tabId);
-      if (msg.mode === 'single' && msg.tabId != null) {
-        chrome.storage.session.set({ pfs_target: msg.tabId });
-      }
+    } else if (msg.type === 'pfs_set_force_embed') {
+      chrome.storage.local.set({ pfs_force_embed: msg.enabled });
+      refreshHeaderRules();
     }
     return;
   }

@@ -105,6 +105,12 @@ html, body {
   padding: 6px 0;
   font-size: 13px;
 }
+.settings-hint {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
 
 /* device select — now lives inside the settings panel */
 #device-select {

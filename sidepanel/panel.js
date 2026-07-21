@@ -11,6 +11,7 @@ const deviceLabel   = document.getElementById('device-label');
 const settingsBtn   = document.getElementById('settings-btn');
 const settingsPanel = document.getElementById('settings-panel');
 const toggleAllTabs = document.getElementById('toggle-all-tabs');
+const toggleForceEmbed = document.getElementById('toggle-force-embed');
 const pausedOverlay = document.getElementById('paused-overlay');
 const statusBarEl   = document.getElementById('status-bar-overlay');
 const homeIndicator = document.getElementById('home-indicator');
@@ -66,10 +67,19 @@ function sameUrl(a, b) {
   catch { return a === b; }
 }
 
+// Hold a long-lived port so the background can scope the force-embed header rules to
+// exactly the time the panel is open. Reconnect if the service worker recycles it.
+function connectPanelPort() {
+  const port = chrome.runtime.connect({ name: 'pfs_panel' });
+  port.onDisconnect.addListener(() => setTimeout(connectPanelPort, 100));
+}
+connectPanelPort();
+
 // ── Load config and boot ──────────────────────────────────────────────
-chrome.storage.local.get('pfs_mode', ({ pfs_mode }) => {
+chrome.storage.local.get(['pfs_mode', 'pfs_force_embed'], ({ pfs_mode, pfs_force_embed }) => {
   mode = pfs_mode === 'all' ? 'all' : 'single';
   if (toggleAllTabs) toggleAllTabs.checked = (mode === 'all');
+  if (toggleForceEmbed) toggleForceEmbed.checked = (pfs_force_embed !== false); // default ON
 
   fetch(BASE + 'frame-config.json')
     .then(r => r.json())
@@ -410,5 +420,16 @@ if (toggleAllTabs) {
     // Re-bind to the current tab: 'all' resumes following it, 'single' locks onto it.
     clearBlocked();
     getActiveTabUrl();
+  });
+}
+
+// ── Force-embed toggle ("Forçar embed de sites bloqueados") ───────────
+if (toggleForceEmbed) {
+  toggleForceEmbed.addEventListener('change', (e) => {
+    const enabled = e.target.checked;
+    chrome.storage.local.set({ pfs_force_embed: enabled });
+    chrome.runtime.sendMessage({ type: 'pfs_set_force_embed', enabled });
+    // Reload the mirror so the header rule change takes effect on the current site.
+    reloadMirror();
   });
 }

@@ -31,12 +31,13 @@ _Screenshot coming soon._
 
 ## Embedding blocked sites (by design)
 
-Many sites refuse to load inside an `<iframe>` via `X-Frame-Options` or a CSP `frame-ancestors` directive. Because this is a developer tool, the extension **intentionally** works around that — but only inside the mirror iframe:
+Many sites refuse to load inside an `<iframe>` via `X-Frame-Options` or a CSP `frame-ancestors` directive. Because this is a developer tool, the extension can work around that — but it is scoped, user-controlled and off unless the panel is open:
 
-- `background.js` uses `declarativeNetRequest` to strip the `X-Frame-Options` and `Content-Security-Policy` response headers **only** for `resourceTypes: ['sub_frame']`. Your normal top-level browsing is never affected.
+- The **"Force embed blocked sites"** toggle (Settings → Advanced, on by default) controls this behavior. You can turn it off at any time.
+- When enabled, `background.js` uses `declarativeNetRequestWithHostAccess` to strip the `X-Frame-Options` and `Content-Security-Policy` response headers **only** for `resourceTypes: ['sub_frame']`, and **only while the side panel is open** (the rules are added on panel open and removed on close). Your normal top-level browsing is never affected.
 - Inside the mirror, `content-script.js` neutralizes JavaScript frame-busting by redefining `window.top` / `window.parent` / `frameElement`.
 
-This is scoped, deliberate and documented — see [SECURITY.md](SECURITY.md) for the trust model. When a site still cannot be embedded (e.g. connection refused), the panel shows a friendly notice instead.
+This is scoped, deliberate and documented — see [SECURITY.md](SECURITY.md) and [PRIVACY.md](PRIVACY.md). When a site still cannot be embedded (e.g. connection refused), the panel shows a friendly notice instead.
 
 ## Installation
 
@@ -52,7 +53,7 @@ This extension is not on the Chrome Web Store. Load it unpacked:
 
 - **Click the toolbar icon** on the tab you want to mirror — the panel opens locked to that tab.
 - **Switch tabs** — the panel stays hidden on other tabs (it's contextual), so it never follows you to unrelated tabs.
-- **Settings** (list icon in the panel) — pick a device, toggle the iOS status bar / browser bars, or enable **"Work on all tabs"** to make the mirror follow whichever tab is active.
+- **Settings** (list icon in the panel) — pick a device, toggle the iOS status bar / browser bars, enable **"Work on all tabs"** to make the mirror follow whichever tab is active, or toggle **"Force embed blocked sites"** (Advanced).
 
 ## Supported devices & adding a new one
 
